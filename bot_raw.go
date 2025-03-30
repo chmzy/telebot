@@ -255,15 +255,32 @@ func (b *Bot) getUpdates(offset, limit int, timeout time.Duration, allowed []str
 }
 
 func (b *Bot) forwardCopyMany(to Recipient, msgs []Editable, key string, opts ...*SendOptions) ([]Message, error) {
-	params := map[string]string{
-		"chat_id": to.Recipient(),
+	if to == nil {
+		return nil, ErrBadRecipient
 	}
+	_, chatID := msgs[0].MessageSig()
+
+	params := map[string]string{
+		"chat_id":      to.Recipient(),
+		"from_chat_id": strconv.FormatInt(chatID, 10),
+		"message_ids":  "",
+	}
+
+	var ids []string
+	for _, msg := range msgs {
+		msgId, _ := msg.MessageSig()
+		ids = append(ids, msgId)
+	}
+	idsString := strings.Join(ids, ",")
+	params["message_ids"] = idsString
 
 	embedMessages(params, msgs)
 
 	if len(opts) > 0 {
 		b.embedSendOptions(params, opts[0])
 	}
+
+	params["chat_id"] = to.Recipient()
 
 	data, err := b.Raw(key, params)
 	if err != nil {
